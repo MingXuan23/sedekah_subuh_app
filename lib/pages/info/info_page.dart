@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -8,6 +9,7 @@ import 'package:prim_derma_app/bloc/auth/login/login_bloc.dart';
 import 'package:prim_derma_app/bloc/info/info_bloc.dart';
 import 'package:prim_derma_app/models/donation_streak.dart';
 import 'package:prim_derma_app/models/user.dart';
+import 'package:prim_derma_app/pages/info/prim_ios_profile_webpage.dart';
 import 'package:prim_derma_app/pages/widget_tree/home_page.dart';
 import 'package:prim_derma_app/repo/env_variable.dart';
 import 'package:prim_derma_app/widget/message_widget.dart';
@@ -36,16 +38,32 @@ class _InfoPageState extends State<InfoPage> {
   }
 
   void openPrimWeb() async {
-    Uri uri =Uri.parse(PRIM__PROFILE_URL);
+    Uri uri = Uri.parse(PRIM__PROFILE_URL);
     var token = await User.retrieveToken();
-    await launchUrl(uri, 
-    mode: LaunchMode.platformDefault,
-   
-    webViewConfiguration: WebViewConfiguration(
-        headers: <String, String>{
-          'Authorization': 'Bearer $token',
-        },
-      ),);
+
+    if (Platform.isIOS) {
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PrimIosProfileWebpage(
+              uri: uri,
+              token: token ?? '',
+            ),
+          ),
+        );
+      }
+    } else {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+        webViewConfiguration: WebViewConfiguration(
+          headers: <String, String>{
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+    }
   }
 
   @override
@@ -195,17 +213,21 @@ class _InfoPageState extends State<InfoPage> {
                                   Radius.circular(12),
                                 ),
                               ),
-                              height: max(constraints.maxHeight * 0.05,40),
+                              height: max(constraints.maxHeight * 0.05, 40),
                               width: constraints.maxWidth * 0.9,
                               child: Center(
                                 child: Text(
                                   "Mata Ganjaraan PRiM Anda: ${DonationStreak.prim_point}pts",
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black ),
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black),
                                 ),
                               ),
                             ),
-                            SizedBox(height: max(constraints.maxHeight * 0.03,30 )),
+                            SizedBox(
+                                height: max(constraints.maxHeight * 0.03, 30)),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [

@@ -46,6 +46,7 @@ dependencies:
   url_launcher: ^6.3.0
   in_app_update: ^4.2.3
   upgrader: ^12.5.0
+  webview_flutter_wkwebview: ^3.23.0
 
 dev_dependencies:
   flutter_test:

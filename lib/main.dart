@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:prim_derma_app/bloc/auth/login/login_bloc.dart';
@@ -20,7 +23,15 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  var token = await _firebaseMessaging.getToken();
+
+  String? token;
+
+  if (Platform.isIOS && kDebugMode) {
+    token = await _firebaseMessaging.getAPNSToken();
+  } else {
+    token = await _firebaseMessaging.getToken();
+  }
+
   User.device_token = token;
 
   NotificationSettings settings = await _firebaseMessaging.requestPermission(
