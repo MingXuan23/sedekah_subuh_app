@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -10,8 +11,11 @@ import 'package:prim_derma_app/models/derma.dart';
 import 'package:prim_derma_app/models/user.dart';
 import 'package:prim_derma_app/pages/derma/derma_function.dart';
 import 'package:prim_derma_app/pages/derma/derma_webpage.dart';
+import 'package:prim_derma_app/repo/derma_repo.dart';
+import 'package:prim_derma_app/repo/env_variable.dart';
 
 import 'package:prim_derma_app/widget/style.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DermaPage extends StatefulWidget {
   const DermaPage({super.key});
@@ -203,14 +207,42 @@ class _DermaPageState extends State<DermaPage> {
 
                           if (await User.validateLogin()) {
                             var token = await User.retrieveToken();
-                            await Navigator.of(context).push(MaterialPageRoute(
-                                builder: (context) => DonateWebView(
-                                      donation_id: derma.id.toString(),
-                                      desc: result,
-                                      token: token!,
-                                      derma: derma,
-                                    )));
-                            retrieveDermaHistory();
+
+                            if (Platform.isIOS) {
+                              final handOffToken =
+                                  await DermaRepo.getHandoffToken(
+                                      userToken: token!,
+                                      donationId: derma.id.toString(),
+                                      desc: result);
+                              if (!context.mounted) return;
+
+                              if (handOffToken.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text("Failed to get token")));
+                              } else {
+                                await launchUrl(
+                                    Uri.parse(
+                                        "$PRIM_WEB_AUTH_HANDOFF_TOKEN_URL/redirect?token=$handOffToken"),
+                                    mode: LaunchMode.externalApplication);
+
+                                retrieveDermaHistory();
+                              }
+                            } else {
+                              if (!context.mounted) return;
+
+                              await Navigator.of(context)
+                                  .push(MaterialPageRoute(
+                                      builder: (context) => DonateWebView(
+                                            donation_id: derma.id.toString(),
+                                            desc: result,
+                                            token: token!,
+                                            derma: derma,
+                                          )));
+
+                              // On Android, this runs exactly when the user returns from the WebView.
+                              retrieveDermaHistory();
+                            }
                           } else {
                             BlocProvider.of<LoginBloc>(context)
                                 .add(AutoLogin());
@@ -218,7 +250,6 @@ class _DermaPageState extends State<DermaPage> {
                         }),
                   )),
             ],
-        
           ),
         ),
       ),
