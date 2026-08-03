@@ -26,12 +26,13 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.prim.prim_derma_app"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility =  JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
     }
     kotlinOptions {
         // Change the jvmTarget here:
@@ -77,6 +78,10 @@ android {
     //         signingConfig = signingConfigs.debug
     //     }
     // }
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }
 
 flutter {

@@ -15,8 +15,8 @@ import 'package:prim_derma_app/pages/widget_tree/start_page.dart';
 import 'package:prim_derma_app/repo/derma_repo.dart';
 import 'package:prim_derma_app/repo/info_repo.dart';
 import 'package:prim_derma_app/repo/user_repo.dart';
+import 'package:prim_derma_app/service/notification_service.dart';
 import 'package:upgrader/upgrader.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -43,6 +43,10 @@ void main() async {
   //   provisional: false,
   //   sound: true,
   // );
+
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.scheduleDailyReminder();
 
   runApp(const MyApp(
     home: StartPage(),
@@ -116,6 +120,7 @@ class MyApp extends StatelessWidget {
               showIgnore: false,
               showLater: false,
               showReleaseNotes: false,
+              shouldPopScope: () => false,
               upgrader: Upgrader(),
               child: home)),
     );
