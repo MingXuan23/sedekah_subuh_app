@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,14 +34,21 @@ class _DonateWebViewState extends State<DonateWebView> {
       return true;
     }
 
-    if (url.contains('directpayIndex') ||  url.contains('directpay.my/pay')) {
+    // ALLOW the initial URL to load
+    if (url.contains('returnDermaView')) {
+      return true;
+    }
+
+    if (url.contains('directpayIndex') || url.contains('directpay.my/pay')) {
       listenReceipt = true;
       setState(() {});
     } else if (url.contains('/derma')) {
       Navigator.of(context).pop();
       return false;
     }
-    return url.contains('directpayIndex') || url.contains('sumbangan') || url.contains('directpay.my/pay');
+    return url.contains('directpayIndex') ||
+        url.contains('sumbangan') ||
+        url.contains('directpay.my/pay');
   }
 
   bool listenReceiptUrl(String url) {
@@ -120,6 +128,7 @@ class _DonateWebViewState extends State<DonateWebView> {
             if (validatePageUrl(url)) {
               //future action
             } else {
+              print("Failed to validate url: $url");
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('Tindakan anda gagal diteruskan')));
               _controller.loadRequest(
@@ -187,7 +196,7 @@ class _DonateWebViewState extends State<DonateWebView> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false, //When false, blocks the current route from being popped.
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, popResult) async {
         if (didPop) {
           return;
         }
@@ -202,33 +211,38 @@ class _DonateWebViewState extends State<DonateWebView> {
           Navigator.of(context).pop();
         }
       },
-      child: Scaffold(
-        body: Column(
-          children: [
-            SizedBox(height: 75),
-            Expanded(child: WebViewWidget(controller: _controller)),
-            if (readTermAndCond) continueButton(),
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(color: HIGHLIGHT_TEXT_COLOR),
-              child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: (listenReceipt)
-                      ? const Text(
-                          'Jangan Tutup App ini Semasa Transaksi Anda Sedang Dijalankan',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
-                        )
-                      : PrimButton(
-                          text: 'Kembali',
-                          color: HIGHLIGHT_TEXT_COLOR,
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                        )),
-            ),
-          ],
+      child: SafeArea(
+        child: Scaffold(
+          // Show the appbar back button when platform is ios and in payment page
+          appBar: Platform.isIOS && listenReceipt ? AppBar() : null,
+          body: Column(
+            children: [
+              if (Platform.isAndroid) const SizedBox(height: 75),
+              Expanded(child: WebViewWidget(controller: _controller)),
+              if (readTermAndCond) continueButton(),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(color: HIGHLIGHT_TEXT_COLOR),
+                child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: (listenReceipt)
+                        ? const Text(
+                            'Jangan Tutup App ini Semasa Transaksi Anda Sedang Dijalankan',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          )
+                        : PrimButton(
+                            text: 'Kembali',
+                            color: HIGHLIGHT_TEXT_COLOR,
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                          )),
+              ),
+            ],
+          ),
         ),
       ),
     );

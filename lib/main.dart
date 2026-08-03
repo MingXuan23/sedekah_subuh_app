@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -14,34 +16,83 @@ import 'package:prim_derma_app/repo/info_repo.dart';
 import 'package:prim_derma_app/repo/user_repo.dart';
 import 'package:prim_derma_app/service/notification_service.dart';
 import 'package:upgrader/upgrader.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  var token = await _firebaseMessaging.getToken();
-  User.device_token = token;
+  // FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
-  NotificationSettings settings = await _firebaseMessaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
+  // String? token;
+
+  // if (Platform.isIOS && kDebugMode) {
+  //   token = await _firebaseMessaging.getAPNSToken();
+  // } else {
+  //   token = await _firebaseMessaging.getToken();
+  // }
+
+  // User.device_token = token;
+
+  // NotificationSettings settings = await _firebaseMessaging.requestPermission(
+  //   alert: true,
+  //   announcement: false,
+  //   badge: true,
+  //   carPlay: false,
+  //   criticalAlert: false,
+  //   provisional: false,
+  //   sound: true,
+  // );
 
   final notificationService = NotificationService();
-  await notificationService.init();
-  await notificationService.scheduleDailyReminder();
+  final notificationsAllowed = await notificationService.init();
+  if (notificationsAllowed) {
+    await notificationService.scheduleDailyReminder();
+  }
 
   runApp(const MyApp(
     home: StartPage(),
   ));
 
+  setupNotifications();
+
   //runApp(const MyApp(home: LoginPage(),));
+}
+
+Future<void> setupNotifications() async {
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  // This triggers the registration process with Apple.
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    // 4. On iOS, wait a small moment for APNs to provide the token
+    // or use a retry loop if getToken() fails.
+    try {
+      String? token;
+      if (Platform.isIOS) {
+        // Optional: wait for APNs token to be ready
+        token = await messaging.getAPNSToken();
+        // If getAPNSToken is successful, then getToken will work
+        if (token != null) {
+          token = await messaging.getToken();
+        }
+      } else {
+        //Android
+        token = await messaging.getToken();
+      }
+
+      if (token != null) {
+        User.device_token = token;
+      }
+    } catch (e) {
+      debugPrint("Error fetching token: $e");
+    }
+  }
 }
 
 class MyApp extends StatelessWidget {
