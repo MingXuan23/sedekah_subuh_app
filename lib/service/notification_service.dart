@@ -1,20 +1,28 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tzdata;
 
 class NotificationService {
+  static const int _dailyReminderId = 0;
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  Future<void> init() async {
+  Future<bool> init() async {
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Asia/Kuala_Lumpur'));
 
     const androidSettings = AndroidInitializationSettings('notification_icon');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+    const iosSettings = IOSInitializationSettings(
+      // Request explicitly after initialization so the result can be handled.
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+      defaultPresentAlert: true,
+      defaultPresentBanner: true,
+      defaultPresentList: true,
+      defaultPresentSound: true,
     );
 
     await _plugin.initialize(
@@ -23,11 +31,29 @@ class NotificationService {
         iOS: iosSettings,
       ),
     );
+
+    return _requestPermissions();
+  }
+
+  Future<bool> _requestPermissions() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+      return true;
+    }
+
+    final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+
+    return await iosPlugin?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        ) ??
+        false;
   }
 
   Future<void> scheduleDailyReminder({int hour = 6, int minute = 0}) async {
     await _plugin.zonedSchedule(
-      id: 0,
+      id: _dailyReminderId,
       title: 'Peluang Sedekah Subuh',
       body: 'Tunaikan segera sehingga 7:30 pagi',
       scheduledDate: _nextInstanceOf(hour, minute),
@@ -39,7 +65,14 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBanner: true,
+          presentList: true,
+          presentSound: true,
+          threadIdentifier: 'daily_reminder',
+          interruptionLevel: InterruptionLevel.active,
+        ),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
@@ -47,7 +80,7 @@ class NotificationService {
   }
 
   Future<void> cancelReminder() async {
-    await _plugin.cancel(id: 0);
+    await _plugin.cancel(id: _dailyReminderId);
   }
 
   tz.TZDateTime _nextInstanceOf(int hour, int minute) {
