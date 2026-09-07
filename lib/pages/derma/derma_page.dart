@@ -10,6 +10,7 @@ import 'package:prim_derma_app/models/derma.dart';
 import 'package:prim_derma_app/models/user.dart';
 import 'package:prim_derma_app/pages/derma/derma_function.dart';
 import 'package:prim_derma_app/pages/derma/derma_webpage.dart';
+import 'package:prim_derma_app/service/notification_service.dart';
 
 import 'package:prim_derma_app/widget/style.dart';
 
@@ -25,6 +26,10 @@ class _DermaPageState extends State<DermaPage> {
   static List<Derma> dermaList = [];
   static List<Derma> dermaHistoryList = [];
   List<Derma> tempDermaList = [];
+  List<Derma> _baseDermaList = [];
+  TextEditingController searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
 
   String _selectedType = '';
   late ScrollController _scrollController;
@@ -34,16 +39,20 @@ class _DermaPageState extends State<DermaPage> {
     _selectedType = value;
 
     if (_selectedType == 'Sejarah Derma Anda') {
-      tempDermaList = dermaHistoryList;
+      _baseDermaList = dermaHistoryList;
+    } else if (_selectedType == 'Semua') {
+      _baseDermaList = dermaList;
     } else {
-      tempDermaList =
-          dermaList.where((x) => x.donationType == selectedType).toList();
+      _baseDermaList = _filterByDonationType(selectedType);
+      // tempDermaList =
+      //     dermaList.where((x) => x.donationType == selectedType).toList();
     }
+    _applySearchFilters();
   }
 
   String get selectedType => _selectedType;
 
-  void retrieveDermaHistory() async {
+  Future<void> retrieveDermaHistory() async {
     var list = await Derma.getDermaHistory();
     dermaHistoryList = list;
     setState(() {});
@@ -64,13 +73,77 @@ class _DermaPageState extends State<DermaPage> {
     _scrollController = ScrollController();
     retrieveDermaHistory();
     BlocProvider.of<DermaBloc>(context).add(RequestDermaList());
+    searchController.addListener(_onSearchChanged);
+
+    pendingRandomAnonDonationNotifier.addListener(_onPendingDonationChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeTriggerRandomAnonDonation();
+    });
+  }
+
+  void _onPendingDonationChanged() {
+    _maybeTriggerRandomAnonDonation();
   }
 
   @override
   void dispose() {
     // TODO: implement dispose
+    pendingRandomAnonDonationNotifier.removeListener(_onPendingDonationChanged);
     _scrollController.dispose();
+    searchController.removeListener(_onSearchChanged);
+    searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = searchController.text.trim().toLowerCase();
+      _applySearchFilters();
+    });
+  }
+
+  void _applySearchFilters() {
+    if (_searchQuery.isEmpty) {
+      tempDermaList = _baseDermaList;
+    } else {
+      tempDermaList = _baseDermaList
+          .where((x) => x.dermaName.toLowerCase().contains(_searchQuery))
+          .toList();
+    }
+  }
+
+  List<Derma> _filterByDonationType(String type) {
+    return dermaList.where((x) => x.donationType == type).toList();
+  }
+
+  Future<void> _startDonation(Derma derma, String type) async {
+    if (await User.validateLogin()) {
+      var token = await User.retrieveToken();
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => DonateWebView(
+          donation_id: derma.id.toString(),
+          desc: type,
+          token: token!,
+          derma: derma,
+        ),
+      ));
+      await retrieveDermaHistory();
+    } else {
+      BlocProvider.of<LoginBloc>(context).add(AutoLogin());
+    }
+  }
+
+  void _maybeTriggerRandomAnonDonation() {
+    if (!pendingRandomAnonDonationNotifier.value || dermaList.isEmpty) {
+      return;
+    }
+    pendingRandomAnonDonationNotifier.value = false;
+    final randomDerma = dermaList[Random().nextInt(dermaList.length)];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startDonation(randomDerma, 'Derma Tanpa Nama');
+    });
   }
 
   @override
@@ -88,12 +161,15 @@ class _DermaPageState extends State<DermaPage> {
             return Random().nextInt(20) - Random().nextInt(20);
           });
           //headerList = [];
-          if (dermaHistoryList.isNotEmpty) {
-            headerList.insert(0, 'Sejarah Derma Anda');
-          }
+
+          // Moved logic to Jenis Derma ListBuilder
+          // if (dermaHistoryList.isEmpty) {
+          //   //headerList.insert(0, 'Sejarah Derma Anda');
+          // }
           selectedType = headerList.isNotEmpty ? headerList[0] : '';
 
           setState(() {});
+          _maybeTriggerRandomAnonDonation();
         } else if (state is UpdateDermaType) {
           selectedType = state.type;
 
@@ -152,6 +228,49 @@ class _DermaPageState extends State<DermaPage> {
     );
   }
 
+  Widget searchBar() {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(40),
+              blurRadius: 16,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: searchController,
+          focusNode: _searchFocusNode,
+          decoration: InputDecoration(
+            hintText: 'Cari derma...',
+            prefixIcon: Icon(Icons.search, color: cs.primary),
+            suffixIcon: searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: Icon(Icons.close, color: cs.primary),
+                    onPressed: () {
+                      searchController.clear();
+                    },
+                  ),
+            filled: true,
+            fillColor: Colors.transparent,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget dermaCard(Derma derma) {
     return Card(
       elevation: 5,
@@ -195,30 +314,17 @@ class _DermaPageState extends State<DermaPage> {
                               fontWeight: FontWeight.w500),
                         ),
                         onPressed: () async {
+                          _searchFocusNode.unfocus();
                           var result = await showDermaActionSheet(context,
                               ['Derma Dengan Nama', 'Derma Tanpa Nama']);
                           if (result == null) {
                             return;
                           }
 
-                          if (await User.validateLogin()) {
-                            var token = await User.retrieveToken();
-                            await Navigator.of(context).push(MaterialPageRoute(
-                                builder: (context) => DonateWebView(
-                                      donation_id: derma.id.toString(),
-                                      desc: result,
-                                      token: token!,
-                                      derma: derma,
-                                    )));
-                            retrieveDermaHistory();
-                          } else {
-                            BlocProvider.of<LoginBloc>(context)
-                                .add(AutoLogin());
-                          }
+                          await _startDonation(derma, result);
                         }),
                   )),
             ],
-        
           ),
         ),
       ),
@@ -226,75 +332,111 @@ class _DermaPageState extends State<DermaPage> {
   }
 
   Widget body() {
-    return Scaffold(
-      appBar: PrimAppBar(
-        'Jom Derma',
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          double containerHeight = min(constraints.maxHeight * 0.23, 250);
-          double cardFontSize = constraints.maxWidth < 600 ? 24 : 28;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _searchFocusNode.unfocus(),
+      child: Scaffold(
+        appBar: PrimAppBar(
+          'Jom Derma',
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final mq = MediaQuery.of(context);
+            final double availableHeight =
+                mq.size.height - kToolbarHeight - kBottomNavigationBarHeight;
+            final double availableWidth = mq.size.width;
 
-          containerHeight = containerHeight +
-              ((constraints.maxHeight < constraints.maxWidth)
-                  ? (constraints.maxHeight * 0.24)
-                  : 0);
+            double containerHeight = min(availableHeight * 0.23, 250);
+            double cardFontSize = availableWidth < 600 ? 24 : 28;
 
-          return Column(
-            children: [
-              Container(
-                margin: EdgeInsets.only(top: 5, left: 5),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey[50],
-                  border: Border(
-                    bottom: BorderSide(color: PRIMARY_PURPLE, width: 6),
-                    left: BorderSide(color: PRIMARY_PURPLE, width: 1.5),
-                    top: BorderSide(color: PRIMARY_PURPLE, width: 1.5),
+            containerHeight += (availableHeight < availableWidth)
+                ? (availableHeight * 0.24)
+                : 0;
+
+            return Column(
+              children: [
+                Container(
+                  margin: EdgeInsets.only(top: 5, left: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey[50],
+                    border: Border(
+                      bottom: BorderSide(color: PRIMARY_PURPLE, width: 6),
+                      left: BorderSide(color: PRIMARY_PURPLE, width: 1.5),
+                      top: BorderSide(color: PRIMARY_PURPLE, width: 1.5),
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
                   ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                  ),
-                ),
-                height: containerHeight,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    if (constraints.maxHeight > constraints.maxWidth)
-                      Text(
-                        'Jenis Derma',
-                        style: TextStyle(
-                          fontSize: cardFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: HIGHLIGHT_TEXT_COLOR,
+                  height: containerHeight,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      if (constraints.maxHeight > constraints.maxWidth)
+                        Text(
+                          'Jenis Derma',
+                          style: TextStyle(
+                            fontSize: cardFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: HIGHLIGHT_TEXT_COLOR,
+                          ),
+                        ),
+                      SizedBox(
+                        height: min(containerHeight * 0.55, 120),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: headerList.length +
+                              1 +
+                              (dermaHistoryList.isNotEmpty ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (dermaHistoryList.isNotEmpty && index == 0) {
+                              return animatedTypeCard('Sejarah Derma Anda');
+                            }
+
+                            if (index ==
+                                (dermaHistoryList.isNotEmpty ? 1 : 0)) {
+                              return animatedTypeCard('Semua');
+                            }
+
+                            final headerIndex = index -
+                                1 -
+                                (dermaHistoryList.isNotEmpty ? 1 : 0);
+
+                            return animatedTypeCard(headerList[headerIndex]);
+                          },
                         ),
                       ),
-                    SizedBox(
-                      height: min(containerHeight * 0.55, 120),
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: headerList.length,
-                        itemBuilder: (context, index) {
-                          return animatedTypeCard(headerList[index]);
-                        },
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(height: constraints.maxHeight * 0.02),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: tempDermaList.length,
-                  itemBuilder: (context, index) {
-                    return dermaCard(tempDermaList[index]);
-                  },
+                SizedBox(height: constraints.maxHeight * 0.01),
+                searchBar(),
+                SizedBox(height: constraints.maxHeight * 0.01),
+                Expanded(
+                  child: tempDermaList.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Tiada hasil jumpai',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: tempDermaList.length,
+                          itemBuilder: (context, index) {
+                            return dermaCard(tempDermaList[index]);
+                          },
+                        ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
