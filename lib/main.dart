@@ -35,13 +35,10 @@ void main() async {
 
   final notificationService = NotificationService();
   await notificationService.init();
-  await notificationService.scheduleDailyReminder();
 
   runApp(const MyApp(
     home: StartPage(),
   ));
-
-  //runApp(const MyApp(home: LoginPage(),));
 }
 
 class MyApp extends StatelessWidget {

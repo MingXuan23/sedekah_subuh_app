@@ -10,6 +10,7 @@ import 'package:prim_derma_app/models/derma.dart';
 import 'package:prim_derma_app/models/user.dart';
 import 'package:prim_derma_app/pages/derma/derma_function.dart';
 import 'package:prim_derma_app/pages/derma/derma_webpage.dart';
+import 'package:prim_derma_app/service/notification_service.dart';
 
 import 'package:prim_derma_app/widget/style.dart';
 
@@ -73,11 +74,22 @@ class _DermaPageState extends State<DermaPage> {
     retrieveDermaHistory();
     BlocProvider.of<DermaBloc>(context).add(RequestDermaList());
     searchController.addListener(_onSearchChanged);
+
+    pendingRandomAnonDonationNotifier.addListener(_onPendingDonationChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeTriggerRandomAnonDonation();
+    });
+  }
+
+  void _onPendingDonationChanged() {
+    _maybeTriggerRandomAnonDonation();
   }
 
   @override
   void dispose() {
     // TODO: implement dispose
+    pendingRandomAnonDonationNotifier.removeListener(_onPendingDonationChanged);
     _scrollController.dispose();
     searchController.removeListener(_onSearchChanged);
     searchController.dispose();
@@ -106,6 +118,34 @@ class _DermaPageState extends State<DermaPage> {
     return dermaList.where((x) => x.donationType == type).toList();
   }
 
+  Future<void> _startDonation(Derma derma, String type) async {
+    if (await User.validateLogin()) {
+      var token = await User.retrieveToken();
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => DonateWebView(
+          donation_id: derma.id.toString(),
+          desc: type,
+          token: token!,
+          derma: derma,
+        ),
+      ));
+      await retrieveDermaHistory();
+    } else {
+      BlocProvider.of<LoginBloc>(context).add(AutoLogin());
+    }
+  }
+
+  void _maybeTriggerRandomAnonDonation() {
+    if (!pendingRandomAnonDonationNotifier.value || dermaList.isEmpty) {
+      return;
+    }
+    pendingRandomAnonDonationNotifier.value = false;
+    final randomDerma = dermaList[Random().nextInt(dermaList.length)];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startDonation(randomDerma, 'Derma Tanpa Nama');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<DermaBloc, DermaState>(
@@ -129,6 +169,7 @@ class _DermaPageState extends State<DermaPage> {
           selectedType = headerList.isNotEmpty ? headerList[0] : '';
 
           setState(() {});
+          _maybeTriggerRandomAnonDonation();
         } else if (state is UpdateDermaType) {
           selectedType = state.type;
 
@@ -280,20 +321,7 @@ class _DermaPageState extends State<DermaPage> {
                             return;
                           }
 
-                          if (await User.validateLogin()) {
-                            var token = await User.retrieveToken();
-                            await Navigator.of(context).push(MaterialPageRoute(
-                                builder: (context) => DonateWebView(
-                                      donation_id: derma.id.toString(),
-                                      desc: result,
-                                      token: token!,
-                                      derma: derma,
-                                    )));
-                            await retrieveDermaHistory();
-                          } else {
-                            BlocProvider.of<LoginBloc>(context)
-                                .add(AutoLogin());
-                          }
+                          await _startDonation(derma, result);
                         }),
                   )),
             ],
