@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:prim_derma_app/bloc/auth/login/login_bloc.dart';
+import 'package:prim_derma_app/bloc/auth/register/register_bloc.dart';
 import 'package:prim_derma_app/bloc/derma/derma_bloc.dart';
 import 'package:prim_derma_app/bloc/info/info_bloc.dart';
 import 'package:prim_derma_app/firebase_options.dart';
@@ -14,6 +15,7 @@ import 'package:prim_derma_app/repo/info_repo.dart';
 import 'package:prim_derma_app/repo/user_repo.dart';
 import 'package:prim_derma_app/service/notification_service.dart';
 import 'package:upgrader/upgrader.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -23,15 +25,8 @@ void main() async {
   var token = await _firebaseMessaging.getToken();
   User.device_token = token;
 
-  NotificationSettings settings = await _firebaseMessaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
+  NotificationSettings notificationSettings =
+      await _firebaseMessaging.requestPermission();
 
   final notificationService = NotificationService();
   await notificationService.init();
@@ -52,6 +47,8 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider<LoginBloc>(
             create: (context) => LoginBloc(LoginInitial(), UserRepo())),
+        BlocProvider<RegisterBloc>(
+            create: (context) => RegisterBloc(UserRepo())),
         BlocProvider<DermaBloc>(
             create: (context) => DermaBloc(DermaInitial(), DermaRepo())),
         BlocProvider<InfoBloc>(
