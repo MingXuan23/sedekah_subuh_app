@@ -1,32 +1,13 @@
 {
   "project_info": {
-    "project_number": "201521096603",
-    "project_id": "prim-notification",
-    "storage_bucket": "prim-notification.appspot.com"
+    "project_number": "444670822255",
+    "project_id": "sedekah-subuh-notification",
+    "storage_bucket": "sedekah-subuh-notification.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:201521096603:android:470089001ae41742f2e33e",
-        "android_client_info": {
-          "package_name": "com.example.prim_timetable_relief"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBnTX6x_9bjRSMwqZ7TalFNPEkAIe00-PE"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:201521096603:android:513789810daaa435f2e33e",
+        "mobilesdk_app_id": "1:444670822255:android:d06cccae631f9f752e4a9a",
         "android_client_info": {
           "package_name": "com.prim.prim_derma_app"
         }
@@ -34,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBnTX6x_9bjRSMwqZ7TalFNPEkAIe00-PE"
+          "current_key": "AIzaSyBjtiSatPFJpAO7yvoYKoQqYOWIqALeUng"
         }
       ],
       "services": {

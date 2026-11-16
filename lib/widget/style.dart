@@ -94,3 +94,7 @@ final Color HIGHLIGHT_TEXT_COLOR = Colors.indigo[900]!;
 final Color SECONDARY_TEXT_COLOR = Colors.blueGrey[800]!;
 final Color SECONDARY_TEAL = Color(0xff116682);
 final Color SECONDARY_GREEN = Colors.green[300]!;
+final Color PRIMARY_BLUE = Color.fromARGB(255, 0, 16, 88);
+
+TextStyle hintTextStyle() =>
+    TextStyle(color: PRIMARY_BLUE, fontWeight: FontWeight.w300, fontSize: 12);
